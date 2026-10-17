@@ -37,8 +37,12 @@ async def lifespan(app: FastAPI):
     logger.info("Starting RAG System")
     await init_db()
 
-    client = AsyncOpenAI(
+    llm_client = AsyncOpenAI(
         api_key=settings.openai_api_key,
+        base_url=settings.openai_base_url
+    )
+    embedding_client = AsyncOpenAI(
+        api_key=settings.embedding_api_key,
         base_url=settings.openai_base_url
     )
 
@@ -49,8 +53,8 @@ async def lifespan(app: FastAPI):
     )
     await store.ensure_index()
 
-    embedding_service = EmbeddingService(client=client)
-    llm_service = LLMService(client=client)
+    embedding_service = EmbeddingService(client=embedding_client)
+    llm_service = LLMService(client=llm_client)
 
     if settings.enable_reranker:
         reranker_service = RerankerService(

@@ -5,6 +5,7 @@ from pathlib import Path
 class Settings(BaseSettings):
     
     openai_api_key: str
+    embedding_api_key: str
     openai_base_url: str
     es_url: str
     es_index: str
