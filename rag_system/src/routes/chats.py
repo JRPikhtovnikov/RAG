@@ -8,8 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.auth import get_current_user
+from src.config import settings
 from src.db import get_session
 from src.models import Chat, ChatMessage, QueryHistory, User, UserSettings
+from src.schemas import ConversationMessage
 from src.routes.schemas import (
     ChatAskResponse,
     ChatCreateRequest,
@@ -80,6 +82,28 @@ async def _load_chat(session: AsyncSession, chat_id: int, user: User) -> Chat:
     if chat is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
     return chat
+
+
+async def _load_recent_history(
+    session: AsyncSession, chat_id: int, user: User,
+) -> List[ConversationMessage]:
+    if settings.chat_history_messages == 0:
+        return []
+    result = await session.execute(
+        select(ChatMessage.role, ChatMessage.content)
+        .join(Chat, Chat.id == ChatMessage.chat_id)
+        .where(
+            ChatMessage.chat_id == chat_id,
+            Chat.user_id == user.id,
+            ChatMessage.role.in_(("user", "assistant")),
+        )
+        .order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc())
+        .limit(settings.chat_history_messages)
+    )
+    return [
+        ConversationMessage(role=message.role, content=message.content)
+        for message in reversed(result.all())
+    ]
 
 
 @router.get("/", response_model=List[ChatSummaryResponse])
@@ -155,7 +179,8 @@ async def ask_in_chat(
     chat = await _load_chat(session, chat_id, current_user)
 
     try:
-        answer, chunks = await request.app.state.query_service.ask(payload.question)
+        history = await _load_recent_history(session, chat.id, current_user)
+        answer, chunks = await request.app.state.query_service.ask(payload.question, history=history)
     except Exception:
         logger.exception("Error during chat ask")
         raise HTTPException(status_code=500, detail="Internal error")

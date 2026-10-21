@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
+from pydantic import Field
 
 
 class Settings(BaseSettings):
@@ -27,6 +28,9 @@ class Settings(BaseSettings):
     reranker_batch_size: int
     jwt_secret: str
     jwt_expire_hours: int = 720
+    chat_history_messages: int = Field(default=12, ge=0, le=100)
+    chat_history_max_chars: int = Field(default=12000, ge=256)
+    chat_rewrite_timeout_seconds: float = Field(default=10.0, gt=0)
     database_url: str = "postgresql+asyncpg://rag:rag@localhost:5433/rag_app"
     cors_origins: list[str] = [
         "http://localhost:5173",
